@@ -58,12 +58,12 @@ java {
   withSourcesJar()
 }
 
-val gsonVersion = "2.14.0"
+val gsonVersion = "2.15.0"
 val slf4jVersion = "2.0.20"
-val logbackVersion = "1.6.5"
+val logbackVersion = "1.6.6"
 val springBootVersion = "4.1.2"
 val picocliVersion = "4.7.7"
-val javalinVersion = "7.2.3"
+val javalinVersion = "7.2.4"
 
 dependencies {
   // https://mvnrepository.com/artifact/io.micrometer/micrometer-registry-jmx
