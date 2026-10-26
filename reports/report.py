@@ -21,7 +21,7 @@ import org.asciidoctor.Options as Options
 import org.asciidoctor.SafeMode as SafeMode
 import java.io.File as File
 # /// jbang
-# requires-jython = "2.7.4"
+# requires-jython = "2.7.5b1"
 # requires-java = "21"
 # runtime-options = [
 #   "-XX:+IgnoreUnrecognizedVMOptions",
@@ -479,6 +479,15 @@ table, th, td {
 table.expanded .extra-col {
     display: table-cell;
 }
+
+/* Style the report to look the same as the navbar sidepanel */
+body {
+    background-color: #f8fafc;
+    color: #334155;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    line-height: 1.2;
+    padding: 20px;
+}
 </style>
 
 <body>
@@ -510,7 +519,7 @@ table.expanded .extra-col {
     <th class="extra-col">MWT</th>
     <th class="extra-col">CPU_T</th>
     <th class="extra-col">CPU</th>
-    <th class="extra-col">CGC_T</th>
+    <th class="extra-col">GC_T</th>
     <th class="extra-col">MEM</th>
   </tr>
 '''
@@ -538,7 +547,7 @@ benchmark_columns = '''
     <th class="extra-col">MWT</th>
     <th class="extra-col">CPU_T</th>
     <th class="extra-col">CPU</th>
-    <th class="extra-col">CGC_T</th>
+    <th class="extra-col">GC_T</th>
     <th class="extra-col">MEM</th>
   </tr>
 '''
@@ -682,7 +691,7 @@ trailer = '''
 charts_html = '''
 <h2>Actions per Second</h2>
   <div id="main" style="width: 100%;height:400px;"></div>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/echarts/6.0.0/echarts.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/echarts/6.1.0/echarts.min.js"></script>
   <script src="__JS_T_CHART__"></script>
 <h2>Response Times (ns)</h2>
   <div id="main_p" style="width: 100%;height:400px;"></div>
@@ -829,7 +838,7 @@ class Summary:
         self.max_qs = 0
         self.name = ""
         self.cpu_time_ns = 0
-        self.cgc_time_ns = 0
+        self.gc_time_ns = 0
         self.chart_t_list = []   # ['2018-04-10T20:40:33.100', 1100, 0]
         self.chart_p_list = []   # ['2018-04-10T20:40:33Z', 1, 5, 10, 20, 25, 30]
         self.aps_count = 0.0
@@ -840,11 +849,11 @@ class Summary:
 def createReport(filename):
 
     def formatTime(timeNanos):
-        if timeNanos < 1000.0:
+        if timeNanos < 1000.0 / 2:
             return "%.1f ns"%(timeNanos)
-        elif timeNanos < 1000000.0:
+        elif timeNanos < 1000000.0 / 2:
             return "%.1f us"%(timeNanos/1000.0)
-        elif timeNanos < 1000000000.0:
+        elif timeNanos < 1000000000.0 / 2:
             return "%.1f ms"%(timeNanos/1000000.0)
         else:
             return "%.1f s"%(timeNanos/1000000000.0)
@@ -950,11 +959,11 @@ def createReport(filename):
         avg_aps = 0.0 if sm.name in ["onStart", "onStop"] else sm.num_actions/sm.duration
         if sm.name in ["onStart", "onStop"]:
             cpu_t = "0:00:00"
-            cgc_t = "0:00:00"
+            gc_t = "0:00:00"
             sm.cpu = 0.0
         else:
             cpu_t = str_from_cpu_time_ns(sm.cpu_time_ns)
-            cgc_t = str_from_cpu_time_ns(sm.cgc_time_ns)
+            gc_t = str_from_cpu_time_ns(sm.gc_time_ns)
 
         statsFilename = '%s_%d.html'%(odir(report_html_fn.split('.')[0]),benchmark_id)
         statsFilenameHtml = '%s_%d.html'%(odirHtml(report_html_fn.split('.')[0]),benchmark_id)
@@ -1094,7 +1103,7 @@ def createReport(filename):
             rd["MWT"] = sm.max_wt
             rd["CPU_T"] = cpu_t
             rd["CPU"] = sm.cpu
-            rd["CGC_T"] = cgc_t
+            rd["GC_T"] = gc_t
             rd["MEM"] = sm.mem
 
             report_json_fh.write('        ,"summary": %s\n'%(json.dumps(rd)))
@@ -1121,7 +1130,7 @@ def createReport(filename):
             formatTime(sm.max_wt),
             cpu_t,
             sm.cpu,
-            cgc_t,
+            gc_t,
             sm.mem)
         if not print_detail_rows:
             html = html.replace("<b>","")
@@ -1295,11 +1304,11 @@ def createReport(filename):
             avg_aps = 0.0 if smx.name in ["onStart", "onStop"] else smx.num_actions/smx.duration
             if smx.name in ["onStart", "onStop"]:
                 cpu_t = "0:00:00"
-                cgc_t = "0:00:00"
+                gc_t = "0:00:00"
                 smx.cpu = 0.0
             else:
                 cpu_t = str_from_cpu_time_ns(smx.cpu_time_ns)
-                cgc_t = str_from_cpu_time_ns(smx.cgc_time_ns)
+                gc_t = str_from_cpu_time_ns(smx.gc_time_ns)
 
             if True:
                 rd = {}
@@ -1345,7 +1354,7 @@ def createReport(filename):
                 formatTime(smx.max_wt),
                 cpu_t,
                 smx.cpu,
-                cgc_t,
+                gc_t,
                 smx.mem)
             if not print_detail_rows:
                 html = html.replace("<b>","")
@@ -1397,11 +1406,11 @@ def createReport(filename):
         p_mem = 100.0 * e["jvm_memory_used"] / e["jvm_memory_maximum"]
         if e["bm_name"] in ["onStart", "onStop"]:
             cpu_t = "0:00:00"
-            cgc_t = "0:00:00"
+            gc_t = "0:00:00"
             p_cpu = 0.0
         else:
             cpu_t = str_from_cpu_time_ns(e["process_cpu_time_ns"])
-            cgc_t = str_from_cpu_time_ns(e["process_cgc_time_ns"])
+            gc_t = str_from_cpu_time_ns(e["process_gc_time_ns"])
             p_cpu = e["process_cpu_utilization"]
         if not json_bm_names.has_key(e["bm_name"]):
             json_bm_names[e["bm_name"]] = 1
@@ -1437,7 +1446,7 @@ def createReport(filename):
             rd["MWT"] = e["max_wt"]
             rd["CPU_T"] = cpu_t
             rd["CPU"] = p_cpu
-            rd["CGC_T"] = cgc_t
+            rd["GC_T"] = gc_t
             rd["MEM"] = p_mem
             if e["row_id"]+1 == 1:
                 report_json_fh.write('         "%d": %s\n'%(e["row_id"]+1,json.dumps(rd)))
@@ -1466,7 +1475,7 @@ def createReport(filename):
                 formatTime(e["max_wt"]),
                 cpu_t,
                 p_cpu,
-                cgc_t,
+                gc_t,
                 p_mem
                 ))
             if len(name2s_list) > 0:
@@ -1493,7 +1502,7 @@ def createReport(filename):
         if sm.cpu < p_cpu:
             sm.cpu = p_cpu
         sm.cpu_time_ns += e["process_cpu_time_ns"]
-        sm.cgc_time_ns += e["process_cgc_time_ns"]
+        sm.gc_time_ns += e["process_gc_time_ns"]
         sm.aps_count += 1.0
         sm.aps_target_sum += e["aps_target_rate"]
 
@@ -1597,7 +1606,7 @@ def createReport(filename):
             if smx.cpu < p_cpu:
                 smx.cpu = p_cpu
             smx.cpu_time_ns += e["process_cpu_time_ns"]
-            smx.cgc_time_ns += e["process_cgc_time_ns"]
+            smx.gc_time_ns += e["process_gc_time_ns"]
 
     print_action_summary()
     print_global_summary()
@@ -1704,6 +1713,12 @@ def createConfigReport(config_json, java_json, config_filename):
             printf('----\n')
             printf('@startuml\n')
             #printf('title %s\n'%(wn))
+            for sname in jb['workflows'][wn].keys():
+                if "," in sname:
+                    nodes = sname.split(",")
+                    for node in nodes:
+                        jb['workflows'][wn][node] = jb['workflows'][wn][sname]
+                    del jb['workflows'][wn][sname]
             for sname in jb['workflows'][wn].keys():
                 if sname in ['-']:
                     printf('state "-" as A0\n')
